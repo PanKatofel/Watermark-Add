@@ -22,17 +22,26 @@ def get_img_from_url():
         return False
     except PIL.UnidentifiedImageError:
         return False
-    except:
+    except requests.exceptions.InvalidSchema:
         return False
     else:
         return img_pil
 
 
 def generate_preview(img_orig):
-    scale = img_orig.height // 250
-    if scale > 1:
-        img_orig = img_orig.resize((int(img_orig.width / scale), int(img_orig.height / scale)), Image.Resampling.LANCZOS)
-    img_orig = img_orig.filter(ImageFilter.SHARPEN)
+    max_width = 1000
+    max_height = 400
+
+    if img_orig.height > max_height:
+        width_scale = max_height / img_orig.height
+        img_orig = img_orig.resize((int(img_orig.width * width_scale), max_height), Image.Resampling.LANCZOS)
+        img_orig = img_orig.filter(ImageFilter.SHARPEN)
+
+    if img_orig.width > max_width:
+        height_scale = max_width / img_orig.width
+        img_orig = img_orig.resize((max_width, int(img_orig.height * height_scale)), Image.Resampling.LANCZOS)
+        img_orig = img_orig.filter(ImageFilter.SHARPEN)
+
     img_orig = add_watermark(img_orig, "© PanKatofel")
     img_tk = ImageTk.PhotoImage(img_orig)
 
