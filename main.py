@@ -1,0 +1,103 @@
+from tkinter import *
+import PIL
+from PIL import Image, ImageTk, ImageFilter, ImageDraw, ImageFont
+from io import BytesIO
+import requests
+
+# -------------------------WINDOW-------------------------
+root = Tk()
+root.title("Watermark App")
+root.state('zoomed')
+
+
+# -------------------------METHODS-------------------------
+def get_img_from_url():
+    try:
+        url = img_url_input.get()
+        response = requests.get(url)
+        img_data = BytesIO(response.content)
+        img_pil = Image.open(img_data).convert("RGBA")
+
+    except requests.exceptions.MissingSchema:
+        return False
+    except PIL.UnidentifiedImageError:
+        return False
+    except:
+        return False
+    else:
+        return img_pil
+
+
+def generate_preview(img_orig):
+    scale = img_orig.height // 250
+    if scale > 1:
+        img_orig = img_orig.resize((int(img_orig.width / scale), int(img_orig.height / scale)), Image.Resampling.LANCZOS)
+    img_orig = img_orig.filter(ImageFilter.SHARPEN)
+    img_orig = add_watermark(img_orig, "© PanKatofel")
+    img_tk = ImageTk.PhotoImage(img_orig)
+
+    return img_tk
+
+
+def generate_img():
+    # Getting image from url
+    img_pil = get_img_from_url()
+    clear_button.config(state="normal")
+
+    if not img_pil:
+        return
+
+    # Preview Image
+    img_tk_preview = generate_preview(img_pil)
+
+    img_label.config(image=img_tk_preview)  # type: ignore
+    img_label.image = img_tk_preview
+
+    img_label.config(width=str(img_tk_preview.width()), height=str(img_tk_preview.height()))
+
+
+def add_watermark(img: Image, watermark_txt: str):
+    text_layer = Image.new("RGBA", img.size, (255, 255, 255, 0))
+    draw = ImageDraw.Draw(text_layer)
+    font_size = int(min(img.width, img.height) * 0.1)
+    font = ImageFont.load_default(font_size)
+    text_size = draw.textbbox((0, 0), watermark_txt, font)
+
+    x = (img.width - text_size[2] - text_size[0]) / 2
+    y = (img.height - text_size[3] - text_size[1]) / 2
+    draw.text(xy=(x, y), text=watermark_txt, font=ImageFont.load_default(font_size), fill=(255, 255, 255, 128))
+    return Image.alpha_composite(img, text_layer).convert("RGB")
+
+
+def clear():
+    placeholder = PhotoImage(file="white-placeholder.png")
+    img_url_input.delete(0, END)
+    img_label.config(image=placeholder, width=400, height=400)
+    img_label.image = placeholder
+    download_button.config(state="disabled")
+    clear_button.config(state="disabled")
+
+
+# -------------------------OBJECTS-------------------------
+top_frame = Frame(root)
+top_frame.pack(pady=(50, 10))
+
+clear_button = Button(top_frame, text="Clear", width=8, command=clear, state="disabled")
+clear_button.pack(side=LEFT)
+
+img_url_input = Entry(top_frame, width=80)
+img_url_input.pack(side=LEFT, padx=10)
+
+generate_button = Button(top_frame, text="Generate", width=8, command=generate_img)
+generate_button.pack(side=RIGHT)
+
+img = PhotoImage(file="white-placeholder.png")
+img_label = Label(root, image=img, width=400, height=400, anchor="center")
+img_label.pack(pady=20)
+
+download_button = Button(text="Download", state="disabled", width=8)
+download_button.pack(pady=10)
+
+
+# ----------------------------------------------------------
+root.mainloop()
