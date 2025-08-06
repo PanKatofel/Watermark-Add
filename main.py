@@ -1,5 +1,6 @@
 from tkinter import *
 from tkinter import messagebox
+from tkinter.filedialog import asksaveasfilename
 import PIL
 from PIL import Image, ImageTk, ImageFilter, ImageDraw, ImageFont
 from io import BytesIO
@@ -9,6 +10,7 @@ import platform
 # -------------------------WINDOW-------------------------
 root = Tk()
 root.title("Watermark App")
+root.img_to_download = None
 
 if platform.system() == "Windows":
     root.state('zoomed')
@@ -35,8 +37,13 @@ def get_img_from_url():
         return False
 
     except requests.exceptions.InvalidSchema:
-        "The URL contains an invalid or unsupported protocol."
+        messagebox.showerror("Error", "The URL contains an invalid or unsupported protocol.")
         return False
+
+    except Exception as e:
+        messagebox.showerror("Error", f"Something gone wrong\n {e}")
+        return False
+
     else:
         return img_pil
 
@@ -66,6 +73,11 @@ def generate_preview(img_orig):
         return False
 
 
+def generate_image_to_download(img_orig):
+    watermark_text = watermark_text_input.get().strip()
+    return add_watermark(img_orig, watermark_text)
+
+
 def generate_img():
     # Getting image from url
     img_pil = get_img_from_url()
@@ -84,6 +96,10 @@ def generate_img():
 
     img_label.config(width=str(img_tk_preview.width()), height=str(img_tk_preview.height()))
 
+    # Image To Download
+    root.img_to_download = generate_image_to_download(img_pil)
+    download_button.config(state="normal")
+
 
 def add_watermark(image: Image, watermark_txt: str):
     text_layer = Image.new("RGBA", image.size, (255, 255, 255, 0))
@@ -92,10 +108,31 @@ def add_watermark(image: Image, watermark_txt: str):
     font = ImageFont.load_default(font_size)
     text_size = draw.textbbox((0, 0), watermark_txt, font)
 
-    x = (image.width - text_size[2] - text_size[0]) / 2
-    y = (image.height - text_size[3] - text_size[1]) / 2
+    width_text = text_size[2] - text_size[0]
+    height_text = text_size[3] - text_size[1]
+
+    x = (image.width - width_text) / 2
+    y = (image.height - height_text) / 2
     draw.text(xy=(x, y), text=watermark_txt, font=ImageFont.load_default(font_size), fill=(255, 255, 255, 128))
     return Image.alpha_composite(image, text_layer).convert("RGB")
+
+
+def download_image(image: Image):
+    if root.img_to_download:
+        file_path = asksaveasfilename(
+            defaultextension=".jpg",
+            filetypes=[("JPEG files", "*.jpg"), ("PNG files", "*.png"), ("All files", "*.*")],
+            title="Save as..."
+        )
+
+        if file_path:
+            try:
+                image.save(file_path)
+                messagebox.showinfo("Success", "The image was saved successfully")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save the image\n{e}")
+
+    download_button.config(state="disabled")
 
 
 def clear():
@@ -108,7 +145,7 @@ def clear():
 
 
 # -------------------------OBJECTS-------------------------
-Label(text="Watermatk Text").pack(pady=(35, 0))
+Label(text="Watermark Text").pack(pady=(35, 0))
 watermark_text_input = Entry(width=80)
 watermark_text_input.pack()
 
@@ -129,7 +166,7 @@ img = PhotoImage(file="white-placeholder.png")
 img_label = Label(root, image=img, width=400, height=400, anchor="center")
 img_label.pack(pady=20)
 
-download_button = Button(text="Download", state="disabled", width=8)
+download_button = Button(text="Download", state="disabled", width=8, command=lambda: download_image(root.img_to_download))
 download_button.pack(pady=10)
 
 
